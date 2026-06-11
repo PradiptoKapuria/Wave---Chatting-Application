@@ -10,39 +10,8 @@ const SUPABASE_ANON_KEY = "sb_publishable_HZDcBfWpWKVWxFqT8GJdPg_0Smq6m8r";
 const isConfigured = () =>
   SUPABASE_URL !== "YOUR_SUPABASE_URL" && SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
 
-// Custom storage adapter backed by the artifact's persistent storage API,
-// since localStorage/sessionStorage are not available in this environment.
-// This lets the Supabase session survive page reloads until the user
-// explicitly logs out.
-const persistentAuthStorage = {
-  getItem: async (key) => {
-    try {
-      const res = await window.storage.get(key, false);
-      return res ? res.value : null;
-    } catch {
-      return null;
-    }
-  },
-  setItem: async (key, value) => {
-    try {
-      await window.storage.set(key, value, false);
-    } catch {}
-  },
-  removeItem: async (key) => {
-    try {
-      await window.storage.delete(key, false);
-    } catch {}
-  },
-};
-
 const supabase = isConfigured()
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        storage: persistentAuthStorage,
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    })
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -419,22 +388,40 @@ export default function NeonChat() {
 
   useEffect(() => {
     if (!isConfigured()) return;
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+
+    // Separate profile fetching logic to safely sync profile user data
+    const fetchProfileAndSetUser = async (sessionUser) => {
+      if (!sessionUser) {
+        setUser(null);
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", sessionUser.id)
+        .maybeSingle(); // Use maybeSingle to prevent crashing if profile takes an extra millisecond to process
+      
+      setUser({ ...sessionUser, username: profile?.username || "user" });
+    };
+
+    // 1. Check for immediate active session on page mount / refresh
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        const { data: profile } = await supabase.from("profiles").select("username").eq("id", session.user.id).single();
-        setUser({ ...session.user, username: profile?.username });
+        fetchProfileAndSetUser(session.user);
       } else {
         setUser(null);
       }
     });
+
+    // 2. Track auth changes globally
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        const { data: profile } = await supabase.from("profiles").select("username").eq("id", session.user.id).single();
-        setUser({ ...session.user, username: profile?.username });
+        fetchProfileAndSetUser(session.user);
       } else {
         setUser(null);
       }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
