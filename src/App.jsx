@@ -389,34 +389,19 @@ export default function NeonChat() {
   useEffect(() => {
     if (!isConfigured()) return;
 
-    // Separate profile fetching logic to safely sync profile user data
-    const fetchProfileAndSetUser = async (sessionUser) => {
-      if (!sessionUser) {
-        setUser(null);
-        return;
-      }
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("id", sessionUser.id)
-        .maybeSingle(); // Use maybeSingle to prevent crashing if profile takes an extra millisecond to process
-      
-      setUser({ ...sessionUser, username: profile?.username || "user" });
-    };
-
-    // 1. Check for immediate active session on page mount / refresh
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        fetchProfileAndSetUser(session.user);
+        const { data: profile } = await supabase.from("profiles").select("username").eq("id", session.user.id).single();
+        setUser({ ...session.user, username: profile?.username });
       } else {
         setUser(null);
       }
     });
 
-    // 2. Track auth changes globally
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        fetchProfileAndSetUser(session.user);
+        const { data: profile } = await supabase.from("profiles").select("username").eq("id", session.user.id).single();
+        setUser({ ...session.user, username: profile?.username });
       } else {
         setUser(null);
       }
@@ -438,8 +423,10 @@ export default function NeonChat() {
   };
 
   if (!isConfigured()) return <><GlobalStyle /><SetupBanner /></>;
+  
+  // ── FIX: Keep showing loading state while session recovers, instead of dropping to Auth Screen
   if (user === undefined) return <><GlobalStyle /><div style={{ minHeight:"100vh", background:BLACK, display:"flex", alignItems:"center", justifyContent:"center", color:G, fontFamily:FONT, fontSize:11, letterSpacing:4 }}>LOADING<span style={{ animation:"blink 1s step-end infinite", marginLeft:2 }}>_</span></div></>;
-  if (!user) return <><GlobalStyle /><AuthScreen onUser={setUser} /></>;
+  if (user === null) return <><GlobalStyle /><AuthScreen onUser={setUser} /></>;
 
   return (
     <>
