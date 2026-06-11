@@ -10,8 +10,39 @@ const SUPABASE_ANON_KEY = "sb_publishable_HZDcBfWpWKVWxFqT8GJdPg_0Smq6m8r";
 const isConfigured = () =>
   SUPABASE_URL !== "YOUR_SUPABASE_URL" && SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
 
+// Custom storage adapter backed by the artifact's persistent storage API,
+// since localStorage/sessionStorage are not available in this environment.
+// This lets the Supabase session survive page reloads until the user
+// explicitly logs out.
+const persistentAuthStorage = {
+  getItem: async (key) => {
+    try {
+      const res = await window.storage.get(key, false);
+      return res ? res.value : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: async (key, value) => {
+    try {
+      await window.storage.set(key, value, false);
+    } catch {}
+  },
+  removeItem: async (key) => {
+    try {
+      await window.storage.delete(key, false);
+    } catch {}
+  },
+};
+
 const supabase = isConfigured()
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storage: persistentAuthStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    })
   : null;
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
