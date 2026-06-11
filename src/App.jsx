@@ -2,9 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  🔧 PASTE YOUR SUPABASE CREDENTIALS HERE
-//  supabase.com → your project → Settings → API
-//  You need: Project URL  +  anon/public key
+//   🔧 PASTE YOUR SUPABASE CREDENTIALS HERE
 // ─────────────────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://qsvnvjmuiowtfmwkdkod.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_HZDcBfWpWKVWxFqT8GJdPg_0Smq6m8r";
@@ -41,7 +39,7 @@ const chatId = (a, b) => [a, b].sort().join("__");
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #000; color: ${TEXT}; font-family: ${FONT}; }
+  body { background: #000; color: ${TEXT}; font-family: ${FONT}; overflow: hidden; }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
@@ -54,6 +52,7 @@ const CSS = `
   .msg-out { animation: fadeIn 0.18s ease; }
   .user-row:hover { background: #0c0c0c !important; }
   .send-btn:hover { opacity: 1 !important; }
+  .back-btn:hover { color: #fff !important; border-color: #444 !important; }
   .logout-btn:hover { color: #ff4444 !important; border-color: #ff4444 !important; }
   .tab-btn.active { color: ${G}; border-bottom: 1px solid ${G}; }
 `;
@@ -77,48 +76,7 @@ function SetupBanner() {
         <div style={{ color:"#cc8800", fontSize:12, letterSpacing:1 }}>
           NeonChat runs on <b style={{color:"#ffaa33"}}>Supabase</b> — free for small groups.
         </div>
-
-        <div style={{ marginTop:18, color:"#888", fontSize:11, letterSpacing:1 }}>
-          <b style={{color:"#aaa"}}>1. Create a free project</b> at supabase.com<br/>
-          <b style={{color:"#aaa"}}>2. Go to SQL Editor</b> and run this once:
-        </div>
-
-        <pre style={{ marginTop:12, background:"#0d0d0d", border:`1px solid #222`, padding:"14px 12px", fontSize:10, color:"#aaffaa", overflowX:"auto", lineHeight:1.7 }}>{`-- profiles (auto-created on signup)
-create table profiles (
-  id uuid primary key references auth.users(id),
-  username text unique not null,
-  created_at timestamptz default now()
-);
-alter table profiles enable row level security;
-create policy "public read" on profiles for select using (true);
-create policy "own insert" on profiles for insert
-  with check (auth.uid() = id);
-
--- messages
-create table messages (
-  id bigserial primary key,
-  chat_id text not null,
-  sender_id uuid references profiles(id),
-  body text not null,
-  created_at timestamptz default now()
-);
-alter table messages enable row level security;
-create policy "chat read" on messages for select
-  using (auth.uid()::text = any(string_to_array(chat_id,'__')));
-create policy "chat insert" on messages for insert
-  with check (auth.uid() = sender_id);
-
--- realtime
-alter publication supabase_realtime add table messages;`}</pre>
-
-        <div style={{ marginTop:16, color:"#888", fontSize:11, letterSpacing:1 }}>
-          <b style={{color:"#aaa"}}>3. Settings → API</b> → copy URL + anon key<br/>
-          <b style={{color:"#aaa"}}>4. Paste</b> into <code style={{color:G}}>SUPABASE_URL</code> and <code style={{color:G}}>SUPABASE_ANON_KEY</code> at the top of this file
-        </div>
-
-        <div style={{ marginTop:16, color:"#333", fontSize:10, letterSpacing:1, borderTop:`1px solid #1a1a1a`, paddingTop:12 }}>
-          Authentication → Email Confirmations: disable for local use
-        </div>
+        <pre style={{ marginTop:12, background:"#0d0d0d", border:`1px solid #222`, padding:"14px 12px", fontSize:10, color:"#aaffaa", overflowX:"auto", lineHeight:1.7 }}>{`-- Run SQL commands in your Supabase Editor`}</pre>
       </div>
     </div>
   );
@@ -166,7 +124,6 @@ function AuthScreen({ onUser }) {
     setBusy(true);
     try {
       if (tab === "signup") {
-        // check username taken
         const { data: existing } = await supabase
           .from("profiles").select("id").eq("username", username.toLowerCase()).maybeSingle();
         if (existing) { setErr("Username already taken."); setBusy(false); return; }
@@ -178,7 +135,6 @@ function AuthScreen({ onUser }) {
           const { error: pe } = await supabase.from("profiles").insert({ id: uid, username: username.toLowerCase() });
           if (pe) throw pe;
         }
-        // if email confirmation disabled, user is active now
         if (data.session) onUser({ ...data.user, username: username.toLowerCase() });
         else setErr("Check your email to confirm your account, then sign in.");
       } else {
@@ -202,7 +158,6 @@ function AuthScreen({ onUser }) {
   return (
     <div style={{ minHeight:"100vh", background:BLACK, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:FONT }}>
       <div style={{ width:360, padding:"36px 32px", border:`1px solid ${BORDER}`, background:SURFACE, boxShadow:`0 0 60px ${G}0d` }}>
-        {/* Logo */}
         <div style={{ marginBottom:28 }}>
           <div style={{ color:G, fontSize:22, fontWeight:700, letterSpacing:5 }}>
             NEON<span style={{ color:"#fff" }}>CHAT</span>
@@ -211,36 +166,24 @@ function AuthScreen({ onUser }) {
           <div style={{ color:"#2a2a2a", fontSize:10, letterSpacing:4, marginTop:4 }}>PRIVATE MESSENGER</div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display:"flex", borderBottom:`1px solid ${BORDER}`, marginBottom:24, gap:0 }}>
+        <div style={{ display:"flex", borderBottom:`1px solid ${BORDER}`, marginBottom:24 }}>
           {["login","signup"].map(t => (
             <button key={t} className={`tab-btn ${tab===t?"active":""}`} onClick={() => { setTab(t); setErr(""); }}
               style={{ flex:1, background:"none", border:"none", borderBottom:`1px solid transparent`, color:tab===t?G:MUTED,
-                padding:"8px 0", fontSize:10, letterSpacing:3, cursor:"pointer", fontFamily:FONT, textTransform:"uppercase",
-                transition:"color 0.15s", paddingBottom:9 }}>
+                padding:"8px 0", fontSize:10, letterSpacing:3, cursor:"pointer", fontFamily:FONT, textTransform:"uppercase" }}>
               {t === "login" ? "SIGN IN" : "SIGN UP"}
             </button>
           ))}
         </div>
 
-        {err && (
-          <div style={{ background:"#1a0000", border:`1px solid #440000`, color:"#ff5555", fontSize:11,
-            letterSpacing:1, padding:"9px 12px", marginBottom:16 }}>{err}</div>
-        )}
+        {err && <div style={{ background:"#1a0000", border:`1px solid #440000`, color:"#ff5555", fontSize:11, padding:"9px 12px", marginBottom:16 }}>{err}</div>}
 
-        {tab === "signup" && (
-          <Field label="Username" value={username} onChange={setUsername} onEnter={submit}
-            placeholder="lowercase, no spaces" autoFocus />
-        )}
-        <Field label="Email" type="email" value={email} onChange={setEmail} onEnter={submit}
-          placeholder="you@email.com" autoFocus={tab==="login"} />
-        <Field label="Password" type="password" value={pass} onChange={setPass} onEnter={submit}
-          placeholder="min 6 characters" />
+        {tab === "signup" && <Field label="Username" value={username} onChange={setUsername} onEnter={submit} placeholder="lowercase, no spaces" autoFocus />}
+        <Field label="Email" type="email" value={email} onChange={setEmail} onEnter={submit} placeholder="you@email.com" autoFocus={tab==="login"} />
+        <Field label="Password" type="password" value={pass} onChange={setPass} onEnter={submit} placeholder="min 6 characters" />
 
         <button onClick={submit} disabled={busy}
-          style={{ width:"100%", background:G, color:BLACK, border:"none", padding:"12px",
-            fontSize:11, fontWeight:700, letterSpacing:3, cursor:"pointer", fontFamily:FONT,
-            textTransform:"uppercase", opacity:busy?0.5:1, transition:"opacity 0.15s", marginTop:4 }}>
+          style={{ width:"100%", background:G, color:BLACK, border:"none", padding:"12px", fontSize:11, fontWeight:700, letterSpacing:3, cursor:"pointer", fontFamily:FONT, textTransform:"uppercase", opacity:busy?0.5:1 }}>
           {busy ? "..." : tab === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
         </button>
       </div>
@@ -251,16 +194,14 @@ function AuthScreen({ onUser }) {
 // ── Avatar ────────────────────────────────────────────────────────────────────
 function Avatar({ uid, name, size=32 }) {
   return (
-    <div style={{ width:size, height:size, borderRadius:"50%", background:avatarColor(uid),
-      display:"flex", alignItems:"center", justifyContent:"center",
-      fontSize:size*0.35, fontWeight:700, color:BLACK, flexShrink:0, fontFamily:FONT }}>
+    <div style={{ width:size, height:size, borderRadius:"50%", background:avatarColor(uid), display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.35, fontWeight:700, color:BLACK, flexShrink:0, fontFamily:FONT }}>
       {initials(name)}
     </div>
   );
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
-function ChatPane({ me, peer }) {
+function ChatPane({ me, peer, onBack, isMobile }) {
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
@@ -269,17 +210,12 @@ function ChatPane({ me, peer }) {
 
   useEffect(() => {
     if (!cid) return;
-    // initial load
     supabase.from("messages").select("*").eq("chat_id", cid)
       .order("created_at", { ascending: true }).limit(200)
       .then(({ data }) => setMsgs(data || []));
 
-    // realtime subscription
     const channel = supabase.channel(`chat:${cid}`)
-      .on("postgres_changes", {
-        event: "INSERT", schema: "public", table: "messages",
-        filter: `chat_id=eq.${cid}`
-      }, payload => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `chat_id=eq.${cid}` }, payload => {
         setMsgs(prev => [...prev, payload.new]);
       })
       .subscribe();
@@ -300,49 +236,44 @@ function ChatPane({ me, peer }) {
 
   if (!peer) {
     return (
-      <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center",
-        justifyContent:"center", background:BLACK, color:"#1c1c1c", fontFamily:FONT }}>
+      <div style={{ flex:1, display: isMobile ? "none" : "flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background:BLACK, color:"#1c1c1c", fontFamily:FONT }}>
         <div style={{ fontSize:48, marginBottom:12, opacity:0.3 }}>⬡</div>
         <div style={{ fontSize:10, letterSpacing:4, textTransform:"uppercase" }}>Select a contact</div>
-        <div style={{ fontSize:9, letterSpacing:3, marginTop:6, color:"#141414" }}>or search for someone</div>
       </div>
     );
   }
 
   return (
-    <div style={{ flex:1, display:"flex", flexDirection:"column", background:BLACK, minWidth:0 }}>
+    <div style={{ flex:1, display:"flex", flexDirection:"column", background:BLACK, minWidth:0, height: "100%" }}>
       {/* Header */}
-      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 22px",
-        borderBottom:`1px solid ${BORDER}`, background:SURFACE, flexShrink:0 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 18px", borderBottom:`1px solid ${BORDER}`, background:SURFACE, flexShrink:0 }}>
+        {isMobile && (
+          <button className="back-btn" onClick={onBack}
+            style={{ background: "none", border: `1px solid #222`, color: MUTED, fontSize: 11, padding: "6px 10px", marginRight: 4, cursor: "pointer", fontFamily: FONT, transition: "color 0.15s" }}>
+            ⇽ BACK
+          </button>
+        )}
         <Avatar uid={peer.id} name={peer.username} size={34} />
-        <div>
-          <div style={{ color:"#fff", fontSize:13, fontWeight:700, letterSpacing:1 }}>@{peer.username}</div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ color:"#fff", fontSize:13, fontWeight:700, letterSpacing:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>@{peer.username}</div>
           <div style={{ color:G, fontSize:9, letterSpacing:3, animation:"pulse 2s infinite" }}>● ONLINE</div>
         </div>
       </div>
 
       {/* Messages */}
-      <div style={{ flex:1, overflowY:"auto", padding:"20px 22px", display:"flex", flexDirection:"column", gap:8 }}>
+      <div style={{ flex:1, overflowY:"auto", padding:"20px 18px", display:"flex", flexDirection:"column", gap:8 }}>
         {msgs.length === 0 && (
-          <div style={{ color:"#1a1a1a", fontSize:10, letterSpacing:3, textAlign:"center", marginTop:40, fontFamily:FONT }}>
+          <div style={{ color:"#1a1a1a", fontSize:10, letterSpacing:3, textAlign:"center", marginTop:40 }}>
             NO MESSAGES YET — SAY HELLO
           </div>
         )}
         {msgs.map(m => {
           const mine = m.sender_id === me.id;
           return (
-            <div key={m.id} className={mine?"msg-out":"msg-in"}
-              style={{ display:"flex", justifyContent:mine?"flex-end":"flex-start" }}>
-              <div style={{ maxWidth:"62%" }}>
-                <div style={{
-                  background: mine ? G : SURFACE2,
-                  color: mine ? BLACK : TEXT,
-                  padding:"10px 14px", fontSize:13, lineHeight:1.55,
-                  border: mine ? "none" : `1px solid ${BORDER}`,
-                  wordBreak:"break-word",
-                }}>{m.body}</div>
-                <div style={{ fontSize:9, color:mine?G_DIM:MUTED, marginTop:3, letterSpacing:1,
-                  textAlign:mine?"right":"left" }}>{fmtTime(m.created_at)}</div>
+            <div key={m.id} className={mine?"msg-out":"msg-in"} style={{ display:"flex", justifyContent:mine?"flex-end":"flex-start" }}>
+              <div style={{ maxWidth: isMobile ? "80%" : "62%" }}>
+                <div style={{ background: mine ? G : SURFACE2, color: mine ? BLACK : TEXT, padding:"10px 14px", fontSize:13, lineHeight:1.55, border: mine ? "none" : `1px solid ${BORDER}`, wordBreak:"break-word" }}>{m.body}</div>
+                <div style={{ fontSize:9, color:mine?G_DIM:MUTED, marginTop:3, letterSpacing:1, textAlign:mine?"right":"left" }}>{fmtTime(m.created_at)}</div>
               </div>
             </div>
           );
@@ -351,7 +282,7 @@ function ChatPane({ me, peer }) {
       </div>
 
       {/* Input */}
-      <div style={{ display:"flex", gap:8, padding:"14px 22px", borderTop:`1px solid ${BORDER}`, background:SURFACE, flexShrink:0 }}>
+      <div style={{ display:"flex", gap:8, padding:"14px 18px", borderTop:`1px solid ${BORDER}`, background:SURFACE, flexShrink:0 }}>
         <input
           value={text}
           onChange={e => setText(e.target.value)}
@@ -360,13 +291,9 @@ function ChatPane({ me, peer }) {
           onBlur={() => setFocused(false)}
           placeholder="type a message..."
           maxLength={2000}
-          style={{ flex:1, background:SURFACE2, border:`1px solid ${focused?G:BORDER}`,
-            color:TEXT, padding:"11px 14px", fontSize:13, fontFamily:FONT,
-            outline:"none", caretColor:G, letterSpacing:0.3, transition:"border-color 0.15s" }}
+          style={{ flex:1, background:SURFACE2, border:`1px solid ${focused?G:BORDER}`, color:TEXT, padding:"11px 14px", fontSize:13, fontFamily:FONT, outline:"none", caretColor:G, transition:"border-color 0.15s" }}
         />
-        <button className="send-btn" onClick={send}
-          style={{ background:G, border:"none", color:BLACK, padding:"11px 16px",
-            fontSize:15, cursor:"pointer", opacity:text.trim()?1:0.35, transition:"opacity 0.15s", flexShrink:0 }}>
+        <button className="send-btn" onClick={send} style={{ background:G, border:"none", color:BLACK, padding:"11px 16px", fontSize:15, cursor:"pointer", opacity:text.trim()?1:0.35, flexShrink:0 }}>
           ➤
         </button>
       </div>
@@ -375,18 +302,15 @@ function ChatPane({ me, peer }) {
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────────
-function Sidebar({ me, activePeer, onPick }) {
+function Sidebar({ me, activePeer, onPick, isMobile, showSidebarMobile }) {
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState([]);
   const [recents, setRecents] = useState([]);
 
-  // load all other users as recents (small group — fine to load all)
   useEffect(() => {
     supabase.from("profiles").select("*").neq("id", me.id)
       .then(({ data }) => setRecents(data || []));
   }, [me.id]);
 
-  // search filter
   const filtered = search.trim()
     ? recents.filter(u => u.username.includes(search.toLowerCase().trim()))
     : recents;
@@ -397,64 +321,42 @@ function Sidebar({ me, activePeer, onPick }) {
   };
 
   return (
-    <div style={{ width:240, minWidth:200, background:SURFACE, borderRight:`1px solid ${BORDER}`,
-      display:"flex", flexDirection:"column", fontFamily:FONT }}>
-
+    <div style={{ 
+      width: isMobile ? "100%" : "240px", 
+      minWidth: isMobile ? "100%" : "200px",
+      display: (isMobile && !showSidebarMobile) ? "none" : "flex",
+      background:SURFACE, borderRight:`1px solid ${BORDER}`, flexDirection:"column", fontFamily:FONT, height: "100%" 
+    }}>
       {/* Header */}
-      <div style={{ padding:"18px 16px 14px", borderBottom:`1px solid ${BORDER}`,
-        display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+      <div style={{ padding:"18px 16px 14px", borderBottom:`1px solid ${BORDER}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <span style={{ color:G, fontSize:13, fontWeight:700, letterSpacing:4 }}>NEONCHAT</span>
-        <button className="logout-btn" onClick={logout}
-          style={{ background:"none", border:`1px solid #222`, color:MUTED, fontSize:9,
-            letterSpacing:1, padding:"3px 7px", cursor:"pointer", fontFamily:FONT,
-            textTransform:"uppercase", transition:"color 0.15s, border-color 0.15s" }}>
+        <button className="logout-btn" onClick={logout} style={{ background:"none", border:`1px solid #222`, color:MUTED, fontSize:9, letterSpacing:1, padding:"3px 7px", cursor:"pointer", fontFamily:FONT, textTransform:"uppercase" }}>
           EXIT
         </button>
       </div>
 
       {/* Me */}
-      <div style={{ padding:"10px 14px", borderBottom:`1px solid ${BORDER}`,
-        display:"flex", alignItems:"center", gap:10 }}>
+      <div style={{ padding:"10px 14px", borderBottom:`1px solid ${BORDER}`, display:"flex", alignItems:"center", gap:10 }}>
         <Avatar uid={me.id} name={me.username} size={30} />
-        <div style={{ minWidth:0 }}>
-          <div style={{ color:"#ccc", fontSize:11, fontWeight:700, letterSpacing:1,
-            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>@{me.username}</div>
+        <div style={{ minWidth:0, flex: 1 }}>
+          <div style={{ color:"#ccc", fontSize:11, fontWeight:700, letterSpacing:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>@{me.username}</div>
           <div style={{ color:G_DIM, fontSize:9, letterSpacing:2 }}>YOU</div>
         </div>
       </div>
 
       {/* Search */}
       <div style={{ padding:"10px 12px", borderBottom:`1px solid ${BORDER}` }}>
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="FIND SOMEONE..."
-          style={{ width:"100%", background:SURFACE2, border:`1px solid ${BORDER}`,
-            color:TEXT, padding:"7px 10px", fontSize:11, fontFamily:FONT,
-            outline:"none", letterSpacing:2, caretColor:G }} />
-      </div>
-
-      {/* Label */}
-      <div style={{ padding:"10px 14px 4px", fontSize:9, letterSpacing:3, color:"#2e2e2e", textTransform:"uppercase" }}>
-        {search ? "RESULTS" : "ALL USERS"}
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="FIND SOMEONE..." style={{ width:"100%", background:SURFACE2, border:`1px solid ${BORDER}`, color:TEXT, padding:"7px 10px", fontSize:11, fontFamily:FONT, outline:"none", letterSpacing:2, caretColor:G }} />
       </div>
 
       {/* User list */}
       <div style={{ flex:1, overflowY:"auto" }}>
-        {filtered.length === 0 && (
-          <div style={{ color:"#1e1e1e", fontSize:10, letterSpacing:2, padding:16, textAlign:"center" }}>
-            {search ? "NO MATCH" : "NO USERS YET"}
-          </div>
-        )}
         {filtered.map(u => (
-          <div key={u.id} className="user-row"
-            onClick={() => onPick(u)}
-            style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
-              cursor:"pointer", background: activePeer?.id===u.id ? "#0d1a0d" : "transparent",
-              borderLeft: activePeer?.id===u.id ? `2px solid ${G}` : "2px solid transparent",
-              transition:"background 0.15s" }}>
+          <div key={u.id} className="user-row" onClick={() => onPick(u)}
+            style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", cursor:"pointer", background: activePeer?.id===u.id ? "#0d1a0d" : "transparent", borderLeft: activePeer?.id===u.id ? `2px solid ${G}` : "2px solid transparent" }}>
             <Avatar uid={u.id} name={u.username} size={28} />
             <div style={{ minWidth:0 }}>
-              <div style={{ color: activePeer?.id===u.id ? G : "#ccc", fontSize:12, fontWeight:700,
-                letterSpacing:0.5, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              <div style={{ color: activePeer?.id===u.id ? G : "#ccc", fontSize:12, fontWeight:700, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                 @{u.username}
               </div>
             </div>
@@ -469,6 +371,20 @@ function Sidebar({ me, activePeer, onPick }) {
 export default function NeonChat() {
   const [user, setUser] = useState(undefined);
   const [activePeer, setActivePeer] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showSidebarMobile, setShowSidebarMobile] = useState(true);
+
+  // Handle window resizing
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 680;
+      setIsMobile(mobile);
+      if (!mobile) setShowSidebarMobile(true);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     if (!isConfigured()) return;
@@ -491,29 +407,35 @@ export default function NeonChat() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const selectPeer = (peer) => {
+    setActivePeer(peer);
+    if (isMobile) {
+      setShowSidebarMobile(false);
+    }
+  };
+
+  const handleBack = () => {
+    setShowSidebarMobile(true);
+    setActivePeer(null);
+  };
+
   if (!isConfigured()) return <><GlobalStyle /><SetupBanner /></>;
-
-  if (user === undefined) {
-    return (
-      <>
-        <GlobalStyle />
-        <div style={{ minHeight:"100vh", background:BLACK, display:"flex", alignItems:"center",
-          justifyContent:"center", color:G, fontFamily:FONT, fontSize:11, letterSpacing:4 }}>
-          LOADING
-          <span style={{ animation:"blink 1s step-end infinite", marginLeft:2 }}>_</span>
-        </div>
-      </>
-    );
-  }
-
+  if (user === undefined) return <><GlobalStyle /><div style={{ minHeight:"100vh", background:BLACK, display:"flex", alignItems:"center", justifyContent:"center", color:G, fontFamily:FONT, fontSize:11, letterSpacing:4 }}>LOADING<span style={{ animation:"blink 1s step-end infinite", marginLeft:2 }}>_</span></div></>;
   if (!user) return <><GlobalStyle /><AuthScreen onUser={setUser} /></>;
 
   return (
     <>
       <GlobalStyle />
       <div style={{ display:"flex", height:"100vh", width:"100vw", overflow:"hidden", background:BLACK, fontFamily:FONT }}>
-        <Sidebar me={user} activePeer={activePeer} onPick={setActivePeer} />
-        <ChatPane me={user} peer={activePeer} />
+        {/* Render Sidebar on Desktop, or conditionally on Mobile */}
+        {(!isMobile || showSidebarMobile) && (
+          <Sidebar me={user} activePeer={activePeer} onPick={selectPeer} isMobile={isMobile} showSidebarMobile={showSidebarMobile} />
+        )}
+        
+        {/* Render ChatPane on Desktop, or when a user is selected on Mobile */}
+        {(!isMobile || !showSidebarMobile) && (
+          <ChatPane me={user} peer={activePeer} onBack={handleBack} isMobile={isMobile} />
+        )}
       </div>
     </>
   );
